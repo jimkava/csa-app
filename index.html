@@ -539,7 +539,7 @@ function drawRLocus(on,od,kMax,kSteps){
   if(olZs.length)tr.push({x:olZs.map(p=>p.re),y:olZs.map(p=>p.im),mode:'markers',marker:{symbol:'circle-open',size:11,color:'#00E87A',line:{width:3}},name:'OL Zeros'});
   Plotly.react('plt-rl',tr,PL({
     title:{text:`Root Locus — K∈[0,${kMax}]`,font:{color:'#C5D0DC',size:11}},
-    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}},scaleanchor:'y',scaleratio:1},
+    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}}},
     yaxis:{...PL().yaxis,title:{text:'Im(s)',font:{color:'#C5D0DC',size:10}}},
     autosize:true,
     margin:{l:50,r:16,t:36,b:46},
