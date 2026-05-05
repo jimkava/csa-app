@@ -510,65 +510,88 @@ function drawPoles(cn,cd,on,od){
 // ── ROOT LOCUS ────────────────────────────────────────────────────────────────
 function drawRLocus(on,od,kMax,kSteps){
   const nP=od.length-1;if(nP<=0)return;
-  const K=Array.from({length:kSteps+1},(_,i)=>i*kMax/kSteps);
+
+  // Asymptotic clip: roots grow as K^(1/nP)
+  const olPs0=roots(od);
+  const maxPoleAbs=Math.max(1,...olPs0.map(p=>cx.abs(p)));
+  const asymClip=Math.pow(kMax,1/Math.max(nP,1))*4+maxPoleAbs*3;
+
+  // Use more steps near K=0 where breakaway happens
+  const Klist=[];
+  for(let i=0;i<=kSteps;i++) Klist.push(kMax*Math.pow(i/kSteps,1));
+
   const loci=Array.from({length:nP},()=>({re:[],im:[]}));
   let prev=null;
 
-  // Compute scale from open-loop poles for clipping
-  const olPs0=roots(od);
-  const maxPoleAbs=Math.max(1,...olPs0.map(p=>cx.abs(p)));
-  const clipVal=maxPoleAbs*50; // allow 50x pole magnitude
-
-  for(const Kv of K){
+  for(const Kv of Klist){
     const pad=[...Array(od.length-on.length).fill(0),...on];
     const cp=od.map((c,i)=>c+Kv*(pad[i]||0));
     let r=roots(cp);
-    if(r.length<nP)r=[...r,...Array(nP-r.length).fill({re:0,im:0})];
+    if(r.length<nP) r=[...r,...Array(nP-r.length).fill({re:0,im:0})];
     r=r.slice(0,nP);
+
+    // Track roots by minimum distance from previous step
     if(prev){
       const used=new Array(nP).fill(false),ord=[];
       for(let ii=0;ii<nP;ii++){
         let md=Infinity,bj=0;
-        for(let jj=0;jj<nP;jj++){if(used[jj])continue;const d=cx.abs(cx.sub(r[jj],prev[ii]));if(d<md){md=d;bj=jj}}
+        for(let jj=0;jj<nP;jj++){
+          if(used[jj])continue;
+          const d=cx.abs(cx.sub(r[jj],prev[ii]));
+          if(d<md){md=d;bj=jj}
+        }
         ord.push(r[bj]);used[bj]=true;
       }
       r=ord;
-    }else r=[...r].sort((a,b)=>Math.atan2(a.im,a.re)-Math.atan2(b.im,b.re));
+    } else {
+      // Sort by angle for consistent initial ordering
+      r=[...r].sort((a,b)=>Math.atan2(a.im,a.re)-Math.atan2(b.im,b.re));
+    }
     prev=r;
+
     for(let li=0;li<nP;li++){
       const rv=r[li];
-      // Clip extreme values to avoid ±1M axis
-      if(Math.abs(rv.re)>clipVal||Math.abs(rv.im)>clipVal){
+      if(!isFinite(rv.re)||!isFinite(rv.im)||
+         Math.abs(rv.re)>asymClip||Math.abs(rv.im)>asymClip){
         loci[li].re.push(null);loci[li].im.push(null);
       } else {
-        loci[li].re.push(rv.re);loci[li].im.push(rv.im);
+        loci[li].re.push(+rv.re.toFixed(6));
+        loci[li].im.push(+rv.im.toFixed(6));
       }
     }
   }
 
   const cols=['#00C7E0','#F0A500','#00E87A','#8A70E0','#FF4545','#FF8C00'];
-  const tr=loci.map((l,i)=>({x:l.re,y:l.im,mode:'lines',line:{color:cols[i%cols.length],width:2},
-    name:`Locus ${i+1}`,connectgaps:false}));
+  const tr=loci.map((l,i)=>({
+    x:l.re,y:l.im,mode:'lines',
+    line:{color:cols[i%cols.length],width:2.5},
+    name:`Locus ${i+1}`,connectgaps:false
+  }));
+
   const olPs=roots(od);
   tr.push({x:olPs.map(p=>p.re),y:olPs.map(p=>p.im),mode:'markers',
-    marker:{symbol:'x',size:11,color:'#FF4545',line:{width:3}},name:'OL Poles'});
+    marker:{symbol:'x',size:12,color:'#FF4545',line:{width:3}},name:'OL Poles'});
   const olZs=roots(on);
-  if(olZs.length)tr.push({x:olZs.map(p=>p.re),y:olZs.map(p=>p.im),mode:'markers',
-    marker:{symbol:'circle-open',size:11,color:'#00E87A',line:{width:3}},name:'OL Zeros'});
+  if(olZs.length&&!(olZs.length===1&&cx.abs(olZs[0])<1e-9))
+    tr.push({x:olZs.map(p=>p.re),y:olZs.map(p=>p.im),mode:'markers',
+      marker:{symbol:'circle-open',size:12,color:'#00E87A',line:{width:3}},name:'OL Zeros'});
 
-  // Smart axis range: based on poles + some margin
-  const allRe=loci.flatMap(l=>l.re.filter(v=>v!==null&&isFinite(v)));
-  const allIm=loci.flatMap(l=>l.im.filter(v=>v!==null&&isFinite(v)));
-  const reMin=Math.min(...allRe)-1,reMax=Math.max(...allRe,0)+1;
-  const imExt=Math.max(Math.abs(Math.min(...allIm)),Math.abs(Math.max(...allIm)),1)+1;
+  // Compute smart axis range from valid data
+  const valRe=loci.flatMap(l=>l.re).filter(v=>v!==null&&isFinite(v));
+  const valIm=loci.flatMap(l=>l.im).filter(v=>v!==null&&isFinite(v));
+  const rMin=valRe.length?Math.min(...valRe):- maxPoleAbs-1;
+  const rMax=valRe.length?Math.max(...valRe,0):1;
+  const iExt=valIm.length?Math.max(Math.abs(Math.min(...valIm)),Math.abs(Math.max(...valIm))):1;
+  const pad=Math.max((rMax-rMin)*0.1,0.5);
+  const iPad=Math.max(iExt*0.15,0.5);
 
   Plotly.react('plt-rl',tr,PL({
-    title:{text:`Root Locus — K∈[0,${kMax}]`,font:{color:'#C5D0DC',size:11}},
-    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}},range:[reMin,reMax]},
-    yaxis:{...PL().yaxis,title:{text:'Im(s)',font:{color:'#C5D0DC',size:10}},range:[-imExt,imExt]},
-    autosize:true,
-    margin:{l:50,r:16,t:36,b:46},
-    shapes:[{type:'line',x0:0,y0:-imExt,x1:0,y1:imExt,line:{color:'rgba(255,80,80,0.3)',dash:'dot',width:1}}]
+    title:{text:`Root Locus  K∈[0,${kMax}]`,font:{color:'#C5D0DC',size:11}},
+    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}},range:[rMin-pad,rMax+pad]},
+    yaxis:{...PL().yaxis,title:{text:'Im(s)',font:{color:'#C5D0DC',size:10}},range:[-(iExt+iPad),iExt+iPad]},
+    autosize:true,margin:{l:50,r:16,t:36,b:46},
+    shapes:[{type:'line',x0:0,y0:-(iExt+iPad),x1:0,y1:iExt+iPad,
+      line:{color:'rgba(255,80,80,0.3)',dash:'dot',width:1}}]
   }),{responsive:true});
 }
 
