@@ -508,46 +508,79 @@ function drawPoles(cn,cd,on,od){
 }
 
 // ── ROOT LOCUS ────────────────────────────────────────────────────────────────
+// Root-finding with explicit initial guess (continuation method)
+function rootsFromGuess(coeffs, guesses){
+  let p=trim([...coeffs]);const n=p.length-1;
+  if(n<=0)return[];
+  if(n===1)return[{re:-p[1]/p[0],im:0}];
+  if(n===2){
+    const a=p[0],b=p[1],c=p[2],D=b*b-4*a*c;
+    if(D>=0)return[{re:(-b+Math.sqrt(D))/(2*a),im:0},{re:(-b-Math.sqrt(D))/(2*a),im:0}];
+    return[{re:-b/(2*a),im:Math.sqrt(-D)/(2*a)},{re:-b/(2*a),im:-Math.sqrt(-D)/(2*a)}];
+  }
+  const a=p.map(c=>c/p[0]);
+  function evalP(z){let r=cx.r(a[0]);for(let k=1;k<a.length;k++)r=cx.add(cx.mul(r,z),cx.r(a[k]));return r}
+  // Start from provided guesses (or default if null)
+  let rs;
+  if(guesses&&guesses.length===n){
+    rs=guesses.map(g=>({re:g.re,im:g.im}));
+  } else {
+    const maxC=Math.max(...a.slice(1).map(Math.abs));
+    const rad=Math.max(0.5,Math.min(maxC*0.5+0.5,50));
+    rs=Array.from({length:n},(_,i)=>({re:rad*Math.cos(2*Math.PI*i/n+0.3),im:rad*Math.sin(2*Math.PI*i/n+0.3)}));
+  }
+  for(let it=0;it<200;it++){
+    const nrs=rs.map((_,k)=>{
+      const pz=evalP(rs[k]);
+      if(cx.abs(pz)<1e-12)return rs[k];
+      let den=cx.r(1);
+      for(let j=0;j<n;j++)if(j!==k)den=cx.mul(den,cx.sub(rs[k],rs[j]));
+      if(cx.abs(den)<1e-20)return rs[k];
+      return cx.sub(rs[k],cx.div(pz,den));
+    });
+    let mc=0;for(let k=0;k<n;k++)mc=Math.max(mc,cx.abs(cx.sub(nrs[k],rs[k])));
+    rs=nrs;if(mc<1e-10)break;
+  }
+  return rs;
+}
+
 function drawRLocus(on,od,kMax,kSteps){
   const nP=od.length-1;if(nP<=0)return;
-
-  // Tight clip based on asymptotic root growth K^(1/nP)
   const olPs0=roots(od);
   const maxPoleAbs=Math.max(1,...olPs0.map(p=>cx.abs(p)));
-  const asymClip=Math.pow(kMax,1/Math.max(nP,1))*2+maxPoleAbs*2;
 
-  // Use more steps near K=0 where breakaway happens
-  const Klist=[];
-  for(let i=0;i<=kSteps;i++) Klist.push(kMax*Math.pow(i/kSteps,1));
+  // Clip: roots grow at most as K^(1/nP)
+  const asymClip=Math.pow(kMax,1/Math.max(nP,1))*3+maxPoleAbs*2;
 
   const loci=Array.from({length:nP},()=>({re:[],im:[]}));
-  let prev=null;
 
-  for(const Kv of Klist){
+  // Start from K=0 poles (exact)
+  let prevRoots=[...olPs0].sort((a,b)=>Math.atan2(a.im,a.re)-Math.atan2(b.im,b.re));
+  while(prevRoots.length<nP)prevRoots.push({re:0,im:0});
+
+  for(let i=0;i<=kSteps;i++){
+    const Kv=kMax*i/kSteps;
     const pad=[...Array(od.length-on.length).fill(0),...on];
-    const cp=od.map((c,i)=>c+Kv*(pad[i]||0));
-    let r=roots(cp);
-    if(r.length<nP) r=[...r,...Array(nP-r.length).fill({re:0,im:0})];
+    const cp=od.map((c,j)=>c+Kv*(pad[j]||0));
+
+    // Use previous roots as initial guess (continuation)
+    let r=rootsFromGuess(cp, prevRoots);
+    if(r.length<nP)r=[...r,...Array(nP-r.length).fill({re:0,im:0})];
     r=r.slice(0,nP);
 
-    // Track roots by minimum distance from previous step
-    if(prev){
-      const used=new Array(nP).fill(false),ord=[];
-      for(let ii=0;ii<nP;ii++){
-        let md=Infinity,bj=0;
-        for(let jj=0;jj<nP;jj++){
-          if(used[jj])continue;
-          const d=cx.abs(cx.sub(r[jj],prev[ii]));
-          if(d<md){md=d;bj=jj}
-        }
-        ord.push(r[bj]);used[bj]=true;
+    // Match roots to previous by minimum distance
+    const used=new Array(nP).fill(false),ord=[];
+    for(let ii=0;ii<nP;ii++){
+      let md=Infinity,bj=0;
+      for(let jj=0;jj<nP;jj++){
+        if(used[jj])continue;
+        const d=cx.abs(cx.sub(r[jj],prevRoots[ii]));
+        if(d<md){md=d;bj=jj}
       }
-      r=ord;
-    } else {
-      // Sort by angle for consistent initial ordering
-      r=[...r].sort((a,b)=>Math.atan2(a.im,a.re)-Math.atan2(b.im,b.re));
+      ord.push(r[bj]);used[bj]=true;
     }
-    prev=r;
+    r=ord;
+    prevRoots=r;
 
     for(let li=0;li<nP;li++){
       const rv=r[li];
@@ -555,8 +588,8 @@ function drawRLocus(on,od,kMax,kSteps){
          Math.abs(rv.re)>asymClip||Math.abs(rv.im)>asymClip){
         loci[li].re.push(null);loci[li].im.push(null);
       } else {
-        loci[li].re.push(+rv.re.toFixed(6));
-        loci[li].im.push(+rv.im.toFixed(6));
+        loci[li].re.push(+rv.re.toFixed(5));
+        loci[li].im.push(+rv.im.toFixed(5));
       }
     }
   }
@@ -576,21 +609,21 @@ function drawRLocus(on,od,kMax,kSteps){
     tr.push({x:olZs.map(p=>p.re),y:olZs.map(p=>p.im),mode:'markers',
       marker:{symbol:'circle-open',size:12,color:'#00E87A',line:{width:3}},name:'OL Zeros'});
 
-  // Compute smart axis range from valid data
+  // Smart axis range
   const valRe=loci.flatMap(l=>l.re).filter(v=>v!==null&&isFinite(v));
   const valIm=loci.flatMap(l=>l.im).filter(v=>v!==null&&isFinite(v));
-  const rMin=valRe.length?Math.min(...valRe):- maxPoleAbs-1;
+  const rMin=valRe.length?Math.min(...valRe):-maxPoleAbs-1;
   const rMax=valRe.length?Math.max(...valRe,0):1;
-  const iExt=valIm.length?Math.max(Math.abs(Math.min(...valIm)),Math.abs(Math.max(...valIm))):1;
-  const pad=Math.max((rMax-rMin)*0.1,0.5);
-  const iPad=Math.max(iExt*0.15,0.5);
+  const iExt=Math.max(valIm.length?Math.max(Math.abs(Math.min(...valIm)),Math.abs(Math.max(...valIm))):1, 0.5);
+  const padX=Math.max((rMax-rMin)*0.12,0.5);
+  const padY=Math.max(iExt*0.18,0.5);
 
   Plotly.react('plt-rl',tr,PL({
     title:{text:`Root Locus  K∈[0,${kMax}]`,font:{color:'#C5D0DC',size:11}},
-    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}},range:[rMin-pad,rMax+pad]},
-    yaxis:{...PL().yaxis,title:{text:'Im(s)',font:{color:'#C5D0DC',size:10}},range:[-(iExt+iPad),iExt+iPad]},
+    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}},range:[rMin-padX,rMax+padX]},
+    yaxis:{...PL().yaxis,title:{text:'Im(s)',font:{color:'#C5D0DC',size:10}},range:[-(iExt+padY),iExt+padY]},
     autosize:true,margin:{l:50,r:16,t:36,b:46},
-    shapes:[{type:'line',x0:0,y0:-(iExt+iPad),x1:0,y1:iExt+iPad,
+    shapes:[{type:'line',x0:0,y0:-(iExt+padY),x1:0,y1:iExt+padY,
       line:{color:'rgba(255,80,80,0.3)',dash:'dot',width:1}}]
   }),{responsive:true});
 }
