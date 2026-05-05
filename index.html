@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Control Systems Analyzer</title>
+<style>
+:root {
+  --bg: #070D1A; --surf: #09111F; --surf2: #0D1F36;
+  --bdr: #1A2D4A; --cyan: #00C7E0; --amber: #F0A500;
+  --green: #00E87A; --red: #FF4545; --purple: #8A70E0;
+  --text: #C5D0DC; --muted: #4A6080; --input-bg: #050D18;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Courier New',monospace;font-size:13px;overflow:hidden}
+
+/* TOP BAR */
+#topbar{display:flex;align-items:center;justify-content:space-between;background:#050A13;
+  border-bottom:1px solid var(--bdr);padding:6px 12px;height:46px;flex-shrink:0}
+#app-title{color:var(--cyan);font-size:13px;font-weight:bold;letter-spacing:.5px}
+#app-sub{color:var(--muted);font-size:9px;margin-top:1px}
+#calc-btn{background:var(--amber);color:#000;font-weight:bold;border:none;
+  padding:7px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-family:'Courier New',monospace;
+  white-space:nowrap;flex-shrink:0}
+#calc-btn:active{filter:brightness(.85)}
+
+/* LAYOUT */
+#wrap{display:flex;height:calc(100vh - 46px);overflow:hidden}
+
+/* LEFT PANEL */
+#left{width:210px;flex-shrink:0;background:var(--surf);border-right:1px solid var(--bdr);
+  overflow-y:auto;padding:6px}
+#toggle-left{display:none}
+.tf-grp{background:var(--bg);border:1px solid var(--bdr);border-radius:4px;padding:7px;margin-bottom:6px}
+.grp-title{color:var(--amber);font-size:10px;font-weight:bold;margin-bottom:5px}
+.tf-row{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.tf-lbl{color:var(--muted);font-size:9px;min-width:68px}
+.tf-in{flex:1;background:var(--input-bg);color:var(--cyan);border:1px solid var(--bdr);
+  border-radius:3px;padding:3px 5px;font-size:12px;font-family:'Courier New',monospace;min-width:0}
+.tf-in:focus{outline:none;border-color:var(--cyan)}
+.sett-row{display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.sett-lbl{color:var(--muted);font-size:9px;min-width:80px}
+.sett-in{width:48px;background:var(--input-bg);color:var(--cyan);border:1px solid var(--bdr);
+  border-radius:3px;padding:2px 5px;font-size:12px;font-family:'Courier New',monospace}
+.sett-in:focus{outline:none;border-color:var(--cyan)}
+.radio-row{display:flex;gap:10px;margin-bottom:5px}
+.r-lbl{color:var(--text);font-size:10px;cursor:pointer;display:flex;align-items:center;gap:3px}
+.hint-txt{color:var(--muted);font-size:8px;line-height:1.5;margin-top:3px}
+
+/* RIGHT PANEL */
+#right{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+
+/* TABS */
+#tabs{display:flex;background:#060E1C;border-bottom:1px solid var(--bdr);overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+.tab{background:transparent;border:none;color:var(--muted);padding:8px 11px;font-size:10px;
+  font-family:'Courier New',monospace;cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent;transition:color .15s}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
+
+/* CONTENT */
+#content{flex:1;overflow:auto;padding:10px;min-height:0}
+.pane{display:none;flex-direction:column;gap:8px;height:100%}
+.pane.on{display:flex}
+
+/* METRICS BOX */
+.metrics{background:var(--surf2);border:1px solid var(--bdr);border-radius:4px;
+  padding:8px 12px;font-size:11px;line-height:1.8;flex-shrink:0}
+
+/* TF DISPLAY */
+.tf-box{background:var(--input-bg);border:1px solid var(--bdr);border-radius:4px;padding:9px 12px}
+.tf-box-title{color:var(--amber);font-size:10px;font-weight:bold;margin-bottom:6px}
+.tf-frac{text-align:center;font-size:12px}
+.tf-num{color:var(--green);border-bottom:1px solid var(--muted);padding-bottom:4px;margin-bottom:4px}
+.tf-den{color:var(--cyan)}
+.tf-eq{color:var(--amber);font-size:12px;padding:4px 0}
+
+/* TABLE */
+.dt{width:100%;border-collapse:collapse;font-size:10px}
+.dt th{background:var(--surf2);color:var(--amber);padding:5px 7px;border:1px solid var(--bdr);text-align:left;white-space:nowrap}
+.dt td{padding:3px 7px;border:1px solid var(--bdr);color:var(--cyan);white-space:nowrap}
+.dt tr:nth-child(odd) td{background:#060D1A}
+.dt tr:nth-child(even) td{background:#07101E}
+
+/* STABILITY */
+.stab{font-size:12px;font-weight:bold;padding:6px 10px;border-radius:4px;flex-shrink:0}
+.stab.ok{color:var(--green);background:rgba(0,232,122,.08)}
+.stab.warn{color:var(--amber);background:rgba(240,165,0,.08)}
+.stab.fail{color:var(--red);background:rgba(255,69,69,.08)}
+
+/* PLOT */
+.plt{flex:1;min-height:250px}
+
+/* MOBILE */
+@media(max-width:620px){
+  #left{position:fixed;left:-215px;top:46px;bottom:0;z-index:100;transition:left .2s;width:215px}
+  #left.open{left:0;box-shadow:4px 0 20px rgba(0,0,0,.6)}
+  #toggle-left{display:flex;align-items:center;justify-content:center;
+    width:36px;height:36px;background:var(--surf2);border:1px solid var(--bdr);
+    border-radius:4px;cursor:pointer;font-size:16px;margin-right:8px;flex-shrink:0}
+  #app-title{font-size:11px}
+  #app-sub{display:none}
+  .tab{font-size:9px;padding:7px 8px}
+  #content{padding:6px}
+  .plt{min-height:220px}
+  .metrics{font-size:10px}
+}
+</style>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#070D1A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CSAnalyzer">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+
+<div id="topbar">
+  <div style="display:flex;align-items:center;gap:0">
+    <div id="toggle-left" onclick="toggleLeft()">☰</div>
+    <div>
+      <div id="app-title">⚙ CONTROL SYSTEMS ANALYZER</div>
+      <div id="app-sub">Dimitrios Kavalieros — EE MSc. &amp; MEd.</div>
+    </div>
+  </div>
+  <button id="calc-btn" onclick="runCalc()">▶ CALCULATE</button>
+</div>
+
+<div id="wrap">
+  <div id="left">
+    <div class="tf-grp">
+      <div class="grp-title">Controller — Gc(s)</div>
+      <div class="tf-row"><span class="tf-lbl">Numerator:</span><input class="tf-in" id="gcn" value="1"></div>
+      <div class="tf-row"><span class="tf-lbl">Denominator:</span><input class="tf-in" id="gcd" value="1 1"></div>
+    </div>
+    <div class="tf-grp">
+      <div class="grp-title">Plant — G(s)</div>
+      <div class="tf-row"><span class="tf-lbl">Numerator:</span><input class="tf-in" id="gn" value="1"></div>
+      <div class="tf-row"><span class="tf-lbl">Denominator:</span><input class="tf-in" id="gd" value="1 2 1"></div>
+    </div>
+    <div class="tf-grp">
+      <div class="grp-title">Feedback — H(s) [1=unity]</div>
+      <div class="tf-row"><span class="tf-lbl">Numerator:</span><input class="tf-in" id="hn" value="1"></div>
+      <div class="tf-row"><span class="tf-lbl">Denominator:</span><input class="tf-in" id="hd" value="1"></div>
+    </div>
+    <div class="tf-grp">
+      <div class="grp-title">Settings</div>
+      <div class="radio-row">
+        <label class="r-lbl"><input type="radio" name="fb" value="neg" checked> Neg.(−)</label>
+        <label class="r-lbl"><input type="radio" name="fb" value="pos"> Pos.(+)</label>
+      </div>
+      <div class="sett-row"><span class="sett-lbl">K max (R.L.):</span><input class="sett-in" id="kmax" value="100"></div>
+      <div class="sett-row"><span class="sett-lbl">K steps:</span><input class="sett-in" id="ksteps" value="200"></div>
+      <div class="sett-row">
+        <span class="sett-lbl">Bode ω (10^n):</span>
+        <input class="sett-in" id="wmin" value="-2" style="width:34px">
+        <span style="color:var(--muted)">→</span>
+        <input class="sett-in" id="wmax" value="3" style="width:34px">
+      </div>
+      <div class="hint-txt">Coefficients highest→lowest<br>e.g. "1 3 2" = s²+3s+2</div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div id="tabs">
+      <button class="tab on"  onclick="sw('block')">Block Diagram</button>
+      <button class="tab"     onclick="sw('tf')">T.F. Results</button>
+      <button class="tab"     onclick="sw('routh')">Routh–Hurwitz</button>
+      <button class="tab"     onclick="sw('poles')">Poles / Zeros</button>
+      <button class="tab"     onclick="sw('rlocus')">Root Locus</button>
+      <button class="tab"     onclick="sw('bode')">Bode</button>
+      <button class="tab"     onclick="sw('nichols')">Nichols</button>
+      <button class="tab"     onclick="sw('step')">Step Response</button>
+    </div>
+
+    <div id="content">
+      <div id="pane-block" class="pane on">
+        <svg id="bsvg" width="100%" viewBox="0 0 700 290" style="flex:1;max-height:420px"></svg>
+      </div>
+      <div id="pane-tf" class="pane">
+        <div class="tf-box"><div class="tf-box-title">Open Loop — Gc(s)·G(s)·H(s)</div>
+          <div class="tf-frac"><div class="tf-num" id="ol-n">—</div><div class="tf-den" id="ol-d">—</div></div></div>
+        <div class="tf-box"><div class="tf-box-title">Closed Loop — T(s)</div>
+          <div class="tf-frac"><div class="tf-num" id="cl-n">—</div><div class="tf-den" id="cl-d">—</div></div></div>
+        <div class="tf-box"><div class="tf-box-title">Characteristic Equation</div>
+          <div class="tf-eq" id="char-eq">—</div></div>
+      </div>
+      <div id="pane-routh" class="pane">
+        <div style="overflow-x:auto;flex:1"><table class="dt" id="rtbl"></table></div>
+        <div class="stab" id="stab-lbl">Waiting...</div>
+      </div>
+      <div id="pane-poles" class="pane">
+        <div style="overflow-x:auto;flex:1"><table class="dt" id="ptbl"></table></div>
+      </div>
+      <div id="pane-rlocus" class="pane">
+        <div id="plt-rl" class="plt"></div>
+      </div>
+      <div id="pane-bode" class="pane">
+        <div class="metrics" id="bode-mg">Waiting...</div>
+        <div id="plt-bm" style="flex:1;min-height:180px"></div>
+        <div id="plt-bp" style="flex:1;min-height:180px"></div>
+      </div>
+      <div id="pane-nichols" class="pane">
+        <div id="plt-nc" class="plt"></div>
+      </div>
+      <div id="pane-step" class="pane">
+        <div class="metrics" id="step-mg">Waiting...</div>
+        <div id="plt-st" class="plt"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+<script>
+'use strict';
+
+// ── COMPLEX ──────────────────────────────────────────────────────────────────
+const cx={
+  add:(a,b)=>({re:a.re+b.re,im:a.im+b.im}),
+  sub:(a,b)=>({re:a.re-b.re,im:a.im-b.im}),
+  mul:(a,b)=>({re:a.re*b.re-a.im*b.im,im:a.re*b.im+a.im*b.re}),
+  div:(a,b)=>{const d=b.re*b.re+b.im*b.im;return{re:(a.re*b.re+a.im*b.im)/d,im:(a.im*b.re-a.re*b.im)/d}},
+  abs:(a)=>Math.sqrt(a.re*a.re+a.im*a.im),
+  r:(x)=>({re:x,im:0})
+};
+
+// ── POLYNOMIAL UTILITIES ─────────────────────────────────────────────────────
+function parse(s){
+  const p=s.trim().split(/\s+/).map(Number).filter(v=>isFinite(v));
+  return p.length?p:[1];
+}
+function trim(p){let i=0;while(i<p.length-1&&Math.abs(p[i])<1e-12)i++;return p.slice(i)}
+function pmul(a,b){const r=new Array(a.length+b.length-1).fill(0);for(let i=0;i<a.length;i++)for(let j=0;j<b.length;j++)r[i+j]+=a[i]*b[j];return r}
+function padd(a,b){const n=Math.max(a.length,b.length);const A=[...Array(n-a.length).fill(0),...a];const B=[...Array(n-b.length).fill(0),...b];return A.map((v,i)=>v+B[i])}
+function pscale(a,k){return a.map(v=>v*k)}
+
+const SUP='⁰¹²³⁴⁵⁶⁷⁸⁹';
+function sup(n){return n.toString().split('').map(d=>SUP[d]).join('')}
+function p2s(p){
+  p=trim([...p]);const n=p.length-1;if(n<0)return'0';
+  let s='';
+  for(let i=0;i<=n;i++){
+    const pow=n-i,c=p[i];
+    if(Math.abs(c)<1e-9)continue;
+    const ca=Math.abs(c);
+    if(s!=='')s+=c<0?' − ':' + ';
+    else if(c<0)s+='−';
+    const showC=!(Math.abs(ca-1)<1e-9&&pow>0);
+    if(showC)s+=ca===Math.round(ca)?ca.toString():ca.toFixed(4);
+    if(pow===1)s+='s';else if(pow>1)s+='s'+sup(pow);
+  }
+  return s||'0';
+}
+
+// ── POLYNOMIAL ROOTS (Durand-Kerner) ─────────────────────────────────────────
+function roots(coeffs){
+  let p=trim([...coeffs]);const n=p.length-1;
+  if(n<=0)return[];
+  if(n===1)return[{re:-p[1]/p[0],im:0}];
+  if(n===2){
+    const a=p[0],b=p[1],c=p[2],D=b*b-4*a*c;
+    if(D>=0)return[{re:(-b+Math.sqrt(D))/(2*a),im:0},{re:(-b-Math.sqrt(D))/(2*a),im:0}];
+    return[{re:-b/(2*a),im:Math.sqrt(-D)/(2*a)},{re:-b/(2*a),im:-Math.sqrt(-D)/(2*a)}];
+  }
+  const a=p.map(c=>c/p[0]);
+  function evalP(z){let r=cx.r(a[0]);for(let k=1;k<a.length;k++)r=cx.add(cx.mul(r,z),cx.r(a[k]));return r}
+  const maxC=Math.max(...a.slice(1).map(Math.abs));
+  const rad=Math.max(0.5,Math.min(maxC*0.5+0.5,50));
+  let rs=Array.from({length:n},(_,i)=>({re:rad*Math.cos(2*Math.PI*i/n+0.3),im:rad*Math.sin(2*Math.PI*i/n+0.3)}));
+  for(let it=0;it<300;it++){
+    const nrs=rs.map((_,k)=>{
+      const pz=evalP(rs[k]);
+      let den=cx.r(1);
+      for(let j=0;j<n;j++)if(j!==k)den=cx.mul(den,cx.sub(rs[k],rs[j]));
+      return cx.sub(rs[k],cx.div(pz,den));
+    });
+    let mc=0;for(let k=0;k<n;k++)mc=Math.max(mc,cx.abs(cx.sub(nrs[k],rs[k])));
+    rs=nrs;if(mc<1e-10)break;
+  }
+  return rs;
+}
+
+// ── ROUTH ────────────────────────────────────────────────────────────────────
+function routh(p){
+  p=trim([...p]);const n=p.length-1;if(n<=0)return{mat:[[p[0]]],n:0};
+  const cols=Math.ceil((n+1)/2);
+  const mat=Array.from({length:n+1},()=>new Array(cols).fill(0));
+  for(let i=0;i<=n;i+=2)mat[0][i/2]=p[i];
+  for(let i=1;i<=n;i+=2)mat[1][(i-1)/2]=p[i];
+  for(let row=2;row<=n;row++){
+    let piv=mat[row-1][0];if(Math.abs(piv)<1e-9){piv=1e-6;mat[row-1][0]=piv}
+    for(let j=0;j<cols-1;j++)mat[row][j]=(mat[row-1][0]*mat[row-2][j+1]-mat[row-2][0]*mat[row-1][j+1])/mat[row-1][0];
+  }
+  return{mat,n};
+}
+
+// ── BODE EVAL ────────────────────────────────────────────────────────────────
+function pjw(c,w){let re=0,im=0;for(const v of c){const nr=-im*w+v,ni=re*w;re=nr;im=ni}return{re,im}}
+function fres(num,den,w){const n=pjw(num,w),d=pjw(den,w);const d2=d.re*d.re+d.im*d.im;return{re:(n.re*d.re+n.im*d.im)/d2,im:(n.im*d.re-n.re*d.im)/d2}}
+
+// ── STEP RESPONSE (RK4) ──────────────────────────────────────────────────────
+function stepResp(num,den){
+  let d=trim([...den]),nb=[...num];
+  const sc=d[0];d=d.map(c=>c/sc);nb=nb.map(c=>c/sc);
+  const ord=d.length-1;
+  if(ord<=0){const g=nb[0]/d[0];const t=[0,10];return{t,y:[g,g]};}
+  while(nb.length<d.length)nb.unshift(0);
+  nb=nb.slice(nb.length-d.length);
+  const D=nb[0];
+  const b=nb.map((c,i)=>c-D*d[i]).slice(1);
+  const a=d.slice(1);
+  // time range from poles
+  const ps=roots(d);
+  let maxT=20;
+  const stab=ps.filter(p=>p.re<-1e-6);
+  if(stab.length>0){const ms=Math.min(...stab.map(p=>Math.abs(p.re)));maxT=Math.min(Math.max(8/ms,4),120);}
+  const N=500,dt=maxT/N;
+  const t=[],y=[];let x=new Array(ord).fill(0);
+  function der(x,u){
+    const dx=new Array(ord).fill(0);
+    for(let i=0;i<ord-1;i++)dx[i]=x[i+1];
+    let s=u;for(let i=0;i<ord;i++)s-=a[ord-1-i]*x[i];
+    dx[ord-1]=s;return dx;
+  }
+  function out(x,u){let yy=D*u;for(let i=0;i<ord;i++)yy+=b[ord-1-i]*x[i];return yy}
+  for(let s=0;s<=N;s++){
+    t.push(s*dt);const yv=out(x,1);y.push(isFinite(yv)?yv:y[y.length-1]||0);
+    if(s<N){
+      const k1=der(x,1),k2=der(x.map((v,i)=>v+dt/2*k1[i]),1),k3=der(x.map((v,i)=>v+dt/2*k2[i]),1),k4=der(x.map((v,i)=>v+dt*k3[i]),1);
+      x=x.map((v,i)=>v+dt/6*(k1[i]+2*k2[i]+2*k3[i]+k4[i]));
+    }
+  }
+  return{t,y};
+}
+
+function stepMetrics(t,y,cln,cld){
+  let yss=cln[cln.length-1]/cld[cld.length-1];
+  if(!isFinite(yss)||Math.abs(yss)<1e-12)yss=y[y.length-1];
+  const yMax=Math.max(...y);
+  const Mp=Math.abs(yss)>1e-6?Math.max(0,(yMax-yss)/Math.abs(yss)*100):0;
+  let tr=NaN,th=NaN,ts2=NaN,ts5=NaN,t10=NaN,t90=NaN;
+  for(let i=0;i<y.length;i++){
+    if(isNaN(t10)&&y[i]>=0.1*yss)t10=t[i];
+    if(isNaN(t90)&&y[i]>=0.9*yss){t90=t[i];break}
+  }
+  if(!isNaN(t10)&&!isNaN(t90))tr=t90-t10;
+  const mi=y.indexOf(yMax);th=t[mi];
+  const b2=0.02*Math.abs(yss),b5=0.05*Math.abs(yss);
+  for(let i=y.length-1;i>=0;i--)if(Math.abs(y[i]-yss)>b2){ts2=t[i];break}
+  for(let i=y.length-1;i>=0;i--)if(Math.abs(y[i]-yss)>b5){ts5=t[i];break}
+  const ps=roots(cld);
+  let zeta=NaN,wn=NaN;
+  const cp=ps.filter(p=>Math.abs(p.im)>1e-4);
+  if(cp.length>0){const dp=cp.reduce((b,p)=>Math.abs(p.re)<Math.abs(b.re)?p:b);wn=cx.abs(dp);zeta=-dp.re/wn;}
+  else{const rp=ps.filter(p=>p.re<0);if(rp.length>0){const dp=rp.reduce((b,p)=>Math.abs(p.re)<Math.abs(b.re)?p:b);wn=Math.abs(dp.re);zeta=1.0;}}
+  return{yss,Mp,tr,th,ts2,ts5,zeta,wn};
+}
+
+// ── PLOTLY LAYOUT ────────────────────────────────────────────────────────────
+function PL(extra){
+  return Object.assign({
+    paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'#06101E',
+    font:{family:'Courier New',color:'#C5D0DC',size:10},
+    margin:{l:46,r:10,t:28,b:38},
+    legend:{bgcolor:'#050D1A',bordercolor:'#1A2D4A',borderwidth:1,font:{size:10}},
+    xaxis:{gridcolor:'#152238',zerolinecolor:'#1A2D4A',color:'#C5D0DC'},
+    yaxis:{gridcolor:'#152238',zerolinecolor:'#1A2D4A',color:'#C5D0DC'}
+  },extra);
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────────
+const TABS=['block','tf','routh','poles','rlocus','bode','nichols','step'];
+function sw(name){
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('on',TABS[i]===name));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+name));
+}
+function toggleLeft(){document.getElementById('left').classList.toggle('open')}
+document.getElementById('content').addEventListener('click',()=>{
+  const l=document.getElementById('left');if(l.classList.contains('open'))l.classList.remove('open');
+});
+
+function fmt(x){return(isNaN(x)||!isFinite(x))?'N/A':parseFloat(x.toPrecision(5)).toString()}
+
+// ── MAIN CALC ────────────────────────────────────────────────────────────────
+function runCalc(){
+  const btn=document.getElementById('calc-btn');
+  btn.textContent='⏳...';btn.disabled=true;
+  setTimeout(()=>{try{calc()}catch(e){alert('Error: '+e.message)}
+    btn.textContent='▶ CALCULATE';btn.disabled=false;},20);
+}
+
+function calc(){
+  const gcn=parse(document.getElementById('gcn').value);
+  const gcd=parse(document.getElementById('gcd').value);
+  const gn =parse(document.getElementById('gn').value);
+  const gd =parse(document.getElementById('gd').value);
+  const hn =parse(document.getElementById('hn').value);
+  const hd =parse(document.getElementById('hd').value);
+  const neg=document.querySelector('input[name="fb"]:checked').value==='neg';
+  const kMax=parseFloat(document.getElementById('kmax').value)||100;
+  const kSteps=parseInt(document.getElementById('ksteps').value)||200;
+  const wMin=parseFloat(document.getElementById('wmin').value)??-2;
+  const wMax=parseFloat(document.getElementById('wmax').value)??3;
+
+  const olNum=pmul(pmul(gcn,gn),hn),olDen=pmul(pmul(gcd,gd),hd);
+  const fwdN=pmul(gcn,gn),fwdD=pmul(gcd,gd);
+  const clNum=pmul(fwdN,hd);
+  const t1=pmul(fwdD,hd),t2=pmul(fwdN,hn);
+  const clDen=neg?padd(t1,t2):padd(t1,pscale(t2,-1));
+  const sc=clDen[0];
+  const clDn=clDen.map(v=>v/sc),clNn=clNum.map(v=>v/sc);
+
+  drawBlock(gcn,gcd,gn,gd,hn,hd,neg);
+  drawTF(olNum,olDen,clNn,clDn);
+  drawRouth(clDn);
+  drawPoles(clNn,clDn,olNum,olDen);
+  drawRLocus(olNum,olDen,kMax,kSteps);
+  drawBode(olNum,olDen,wMin,wMax);
+  drawNichols(olNum,olDen,wMin,wMax);
+  drawStep(clNn,clDn);
+}
+
+// ── BLOCK DIAGRAM ────────────────────────────────────────────────────────────
+function drawBlock(gcn,gcd,gn,gd,hn,hd,neg){
+  const showH=!(hn.length===1&&Math.abs(hn[0]-1)<1e-9&&hd.length===1&&Math.abs(hd[0]-1)<1e-9);
+  const gcS=p2s(gcn)+'/('+p2s(gcd)+')';
+  const gS=p2s(gn)+'/('+p2s(gd)+')';
+  const hS=p2s(hn)+'/('+p2s(hd)+')';
+  const mY=115,fbY=220;
+  const wC='#00C7E0',fbC='#8A70E0',bF='#0D1F36',bS='#1A2D4A',lC='#F0A500',mC='#2A3E58';
+  document.getElementById('bsvg').innerHTML=`
+    <rect width="700" height="290" fill="#070D1A"/>
+    <line x1="18" y1="${mY}" x2="88" y2="${mY}" stroke="${wC}" stroke-width="2"/>
+    <line x1="128" y1="${mY}" x2="165" y2="${mY}" stroke="${wC}" stroke-width="2"/>
+    <line x1="305" y1="${mY}" x2="335" y2="${mY}" stroke="${wC}" stroke-width="2"/>
+    <line x1="475" y1="${mY}" x2="510" y2="${mY}" stroke="${wC}" stroke-width="2"/>
+    <line x1="510" y1="${mY}" x2="680" y2="${mY}" stroke="${wC}" stroke-width="2"/>
+    <text x="14" y="${mY+5}" fill="${wC}" font-size="12" font-family="Courier New" text-anchor="end">R(s)</text>
+    <text x="684" y="${mY+5}" fill="${wC}" font-size="12" font-family="Courier New">Y(s)</text>
+    <circle cx="108" cy="${mY}" r="20" fill="${bF}" stroke="${bS}" stroke-width="1.5"/>
+    <line x1="96" y1="${mY}" x2="120" y2="${mY}" stroke="${wC}" stroke-width="1.5"/>
+    <line x1="108" y1="${mY-12}" x2="108" y2="${mY+12}" stroke="${wC}" stroke-width="1.5"/>
+    <text x="99" y="${mY+4}" fill="${wC}" font-size="11" font-family="Courier New">+</text>
+    <text x="92" y="${mY-4}" fill="${fbC}" font-size="14" font-family="Courier New">${neg?'−':'+'}</text>
+    <text x="148" y="${mY-8}" fill="${lC}" font-size="9" font-family="Courier New">E(s)</text>
+    <rect x="165" y="${mY-33}" width="140" height="66" rx="5" fill="${bF}" stroke="${bS}" stroke-width="1.5"/>
+    <text x="235" y="${mY-10}" fill="${lC}" font-size="9" font-family="Courier New" text-anchor="middle">Controller</text>
+    <text x="235" y="${mY+6}" fill="${wC}" font-size="13" font-family="Courier New" text-anchor="middle" font-weight="bold">Gc(s)</text>
+    <text x="235" y="${mY+22}" fill="${mC}" font-size="8" font-family="Courier New" text-anchor="middle">${gcS}</text>
+    <text x="318" y="${mY-8}" fill="${lC}" font-size="9" font-family="Courier New">U(s)</text>
+    <rect x="335" y="${mY-33}" width="140" height="66" rx="5" fill="${bF}" stroke="${bS}" stroke-width="1.5"/>
+    <text x="405" y="${mY-10}" fill="${lC}" font-size="9" font-family="Courier New" text-anchor="middle">Plant</text>
+    <text x="405" y="${mY+6}" fill="${wC}" font-size="13" font-family="Courier New" text-anchor="middle" font-weight="bold">G(s)</text>
+    <text x="405" y="${mY+22}" fill="${mC}" font-size="8" font-family="Courier New" text-anchor="middle">${gS}</text>
+    <circle cx="510" cy="${mY}" r="5" fill="${wC}"/>
+    <line x1="510" y1="${mY}" x2="510" y2="${fbY}" stroke="${fbC}" stroke-width="2"/>
+    ${showH?`
+    <line x1="108" y1="${fbY}" x2="510" y2="${fbY}" stroke="${fbC}" stroke-width="2"/>
+    <rect x="340" y="${fbY-25}" width="110" height="50" rx="5" fill="${bF}" stroke="${fbC}" stroke-width="1.5"/>
+    <text x="395" y="${fbY-5}" fill="${lC}" font-size="9" font-family="Courier New" text-anchor="middle">Sensor</text>
+    <text x="395" y="${fbY+10}" fill="${fbC}" font-size="13" font-family="Courier New" text-anchor="middle" font-weight="bold">H(s)</text>
+    <text x="395" y="${fbY+23}" fill="${mC}" font-size="8" font-family="Courier New" text-anchor="middle">${hS}</text>
+    <line x1="108" y1="${fbY}" x2="108" y2="${mY+20}" stroke="${fbC}" stroke-width="2"/>
+    `:`
+    <line x1="108" y1="${fbY}" x2="510" y2="${fbY}" stroke="${fbC}" stroke-width="2"/>
+    <line x1="108" y1="${fbY}" x2="108" y2="${mY+20}" stroke="${fbC}" stroke-width="2"/>
+    <text x="310" y="${fbY-6}" fill="${fbC}" font-size="10" font-family="Courier New" text-anchor="middle">Unity Feedback  H(s) = 1</text>
+    `}`;
+}
+
+// ── TF RESULTS ───────────────────────────────────────────────────────────────
+function drawTF(on,od,cn,cd){
+  document.getElementById('ol-n').textContent=p2s(on);
+  document.getElementById('ol-d').textContent=p2s(od);
+  document.getElementById('cl-n').textContent=p2s(cn);
+  document.getElementById('cl-d').textContent=p2s(cd);
+  document.getElementById('char-eq').textContent=p2s(cd)+' = 0';
+}
+
+// ── ROUTH ────────────────────────────────────────────────────────────────────
+function drawRouth(p){
+  const{mat,n}=routh(p);const rows=mat.length,cols=mat[0].length;
+  let h='<thead><tr><th>Row</th>';for(let j=0;j<cols;j++)h+=`<th>Col.${j+1}</th>`;h+='</tr></thead><tbody>';
+  for(let i=0;i<rows;i++){
+    h+=`<tr><td>s${sup(n-i)}</td>`;
+    for(let j=0;j<cols;j++){const v=mat[i][j];h+=`<td>${Math.abs(v)<1e-9?'0':v===Math.round(v)?v:v.toFixed(4)}</td>`}
+    h+='</tr>';
+  }
+  document.getElementById('rtbl').innerHTML=h+'</tbody>';
+  const fc=mat.map(r=>r[0]);let chg=0;for(let i=1;i<fc.length;i++)if(fc[i-1]*fc[i]<0)chg++;
+  const hz=fc.some(v=>Math.abs(v)<1e-5);
+  const el=document.getElementById('stab-lbl');
+  if(hz){el.textContent='⚠ MARGINAL STABILITY — Zero pivot';el.className='stab warn';}
+  else if(chg===0){el.textContent='✓ STABLE — All poles in LHP';el.className='stab ok';}
+  else{el.textContent=`✗ UNSTABLE — ${chg} sign change(s) → ${chg} pole(s) in RHP`;el.className='stab fail';}
+}
+
+// ── POLES/ZEROS ───────────────────────────────────────────────────────────────
+function drawPoles(cn,cd,on,od){
+  const clP=roots(cd),clZ=roots(cn),olP=roots(od),olZ=roots(on);
+  const all=[...clP.map(p=>({...p,tp:'CL Pole'})),...clZ.map(p=>({...p,tp:'CL Zero'})),
+             ...olP.map(p=>({...p,tp:'OL Pole'})),...olZ.map(p=>({...p,tp:'OL Zero'}))];
+  let h='<thead><tr><th>Type</th><th>Re</th><th>Im</th><th>|ρ|</th><th>θ°</th><th>Location</th></tr></thead><tbody>';
+  for(const p of all){
+    const mg=cx.abs(p),ag=(Math.atan2(p.im,p.re)*180/Math.PI).toFixed(1);
+    const loc=p.re>1e-6?'RHP':Math.abs(p.re)<1e-5&&Math.abs(p.im)>1e-6?'jω-axis':'LHP';
+    const lc=p.re>1e-6?'color:#FF4545':Math.abs(p.re)<1e-5&&Math.abs(p.im)>1e-6?'color:#F0A500':'';
+    h+=`<tr><td>${p.tp}</td><td>${p.re.toFixed(4)}</td><td>${p.im.toFixed(4)}</td><td>${mg.toFixed(4)}</td><td>${ag}</td><td style="${lc}">${loc}</td></tr>`;
+  }
+  document.getElementById('ptbl').innerHTML=h+'</tbody>';
+}
+
+// ── ROOT LOCUS ────────────────────────────────────────────────────────────────
+function drawRLocus(on,od,kMax,kSteps){
+  const nP=od.length-1;if(nP<=0)return;
+  const K=Array.from({length:kSteps+1},(_,i)=>i*kMax/kSteps);
+  const loci=Array.from({length:nP},()=>({re:[],im:[]}));
+  let prev=null;
+  for(const Kv of K){
+    const pad=[...Array(od.length-on.length).fill(0),...on];
+    const cp=od.map((c,i)=>c+Kv*(pad[i]||0));
+    let r=roots(cp);
+    if(r.length<nP)r=[...r,...Array(nP-r.length).fill({re:0,im:0})];
+    r=r.slice(0,nP);
+    if(prev){
+      const used=new Array(nP).fill(false),ord=[];
+      for(let ii=0;ii<nP;ii++){
+        let md=Infinity,bj=0;
+        for(let jj=0;jj<nP;jj++){if(used[jj])continue;const d=cx.abs(cx.sub(r[jj],prev[ii]));if(d<md){md=d;bj=jj}}
+        ord.push(r[bj]);used[bj]=true;
+      }
+      r=ord;
+    }else r=[...r].sort((a,b)=>Math.atan2(a.im,a.re)-Math.atan2(b.im,b.re));
+    prev=r;
+    for(let li=0;li<nP;li++){loci[li].re.push(r[li].re);loci[li].im.push(r[li].im);}
+  }
+  const cols=['#00C7E0','#F0A500','#00E87A','#8A70E0','#FF4545','#FF8C00'];
+  const tr=loci.map((l,i)=>({x:l.re,y:l.im,mode:'lines',line:{color:cols[i%cols.length],width:2},name:`Locus ${i+1}`}));
+  const olPs=roots(od);
+  tr.push({x:olPs.map(p=>p.re),y:olPs.map(p=>p.im),mode:'markers',marker:{symbol:'x',size:11,color:'#FF4545',line:{width:3}},name:'OL Poles'});
+  const olZs=roots(on);
+  if(olZs.length)tr.push({x:olZs.map(p=>p.re),y:olZs.map(p=>p.im),mode:'markers',marker:{symbol:'circle-open',size:11,color:'#00E87A',line:{width:3}},name:'OL Zeros'});
+  Plotly.react('plt-rl',tr,PL({
+    title:{text:`Root Locus — K∈[0,${kMax}]`,font:{color:'#C5D0DC',size:11}},
+    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}}},
+    yaxis:{...PL().yaxis,title:{text:'Im(s)',font:{color:'#C5D0DC',size:10}}},
+    shapes:[{type:'line',x0:0,y0:-1e6,x1:0,y1:1e6,line:{color:'rgba(255,80,80,0.3)',dash:'dot',width:1}}]
+  }),{responsive:true});
+}
+
+// ── BODE ─────────────────────────────────────────────────────────────────────
+function drawBode(on,od,wMin,wMax){
+  const w=Array.from({length:400},(_,i)=>Math.pow(10,wMin+i*(wMax-wMin)/399));
+  const md=[],ph=[];
+  for(const v of w){const h=fres(on,od,v);md.push(20*Math.log10(cx.abs(h)+1e-300));ph.push(Math.atan2(h.im,h.re)*180/Math.PI);}
+  const pu=[...ph];
+  for(let i=1;i<pu.length;i++){let d=pu[i]-pu[i-1];while(d>180)d-=360;while(d<-180)d+=360;pu[i]=pu[i-1]+d;}
+  let gm=Infinity,pm=NaN,wgm=NaN,wpm=NaN;
+  for(let i=1;i<pu.length;i++){
+    if(pu[i-1]>-180&&pu[i]<=-180){const t=(-180-pu[i-1])/(pu[i]-pu[i-1]);wgm=w[i-1]+t*(w[i]-w[i-1]);const m=cx.abs(fres(on,od,wgm));gm=m>1e-12?1/m:Infinity;}
+    if(md[i-1]>0&&md[i]<=0){const t=-md[i-1]/(md[i]-md[i-1]);wpm=w[i-1]+t*(w[i]-w[i-1]);pm=180+Math.atan2(fres(on,od,wpm).im,fres(on,od,wpm).re)*180/Math.PI;}
+  }
+  const gmDB=isFinite(gm)?20*Math.log10(gm):Infinity;
+  const gmT=isFinite(gmDB)?`${gmDB.toFixed(2)} dB @ ω=${wgm.toFixed(3)} rad/s`:'∞';
+  const pmT=!isNaN(pm)?`${pm.toFixed(2)}° @ ω=${wpm.toFixed(3)} rad/s`:'N/A';
+  const mg=document.getElementById('bode-mg');
+  mg.textContent=`G.M.: ${gmT}   |   P.M.: ${pmT}`;
+  mg.style.color=(gmDB>6&&pm>45)?'#00E87A':(gmDB>0&&pm>0)?'#F0A500':'#FF4545';
+  Plotly.react('plt-bm',[{x:w,y:md,mode:'lines',line:{color:'#00C7E0',width:2},name:'|G| dB'},
+    {x:[w[0],w[w.length-1]],y:[0,0],mode:'lines',line:{color:'#FF4545',dash:'dash',width:1},showlegend:false}],
+    PL({height:200,xaxis:{...PL().xaxis,type:'log',title:{text:'ω (rad/s)',font:{size:10}}},
+      yaxis:{...PL().yaxis,title:{text:'Magnitude (dB)',font:{size:10}}},
+      title:{text:'Bode Diagram',font:{color:'#C5D0DC',size:11}},margin:{l:46,r:10,t:26,b:34}}),{responsive:true});
+  Plotly.react('plt-bp',[{x:w,y:pu,mode:'lines',line:{color:'#8A70E0',width:2},name:'Phase'}],
+    PL({height:200,xaxis:{...PL().xaxis,type:'log',title:{text:'ω (rad/s)',font:{size:10}}},
+      yaxis:{...PL().yaxis,title:{text:'Phase (°)',font:{size:10}}},margin:{l:46,r:10,t:6,b:36}}),{responsive:true});
+}
+
+// ── NICHOLS ───────────────────────────────────────────────────────────────────
+function drawNichols(on,od,wMin,wMax){
+  const w=Array.from({length:400},(_,i)=>Math.pow(10,wMin+i*(wMax-wMin)/399));
+  const md=[],ph=[];
+  for(const v of w){const h=fres(on,od,v);md.push(20*Math.log10(cx.abs(h)+1e-300));ph.push(Math.atan2(h.im,h.re)*180/Math.PI);}
+  const pu=[...ph];for(let i=1;i<pu.length;i++){let d=pu[i]-pu[i-1];while(d>180)d-=360;while(d<-180)d+=360;pu[i]=pu[i-1]+d;}
+  Plotly.react('plt-nc',[
+    {x:pu,y:md,mode:'lines',line:{color:'#00C7E0',width:2},name:'G(jω)'},
+    {x:[-180],y:[0],mode:'markers',marker:{symbol:'x',size:14,color:'#FF4545',line:{width:3}},name:'Critical (−180°, 0dB)'}
+  ],PL({title:{text:'Nichols Chart',font:{color:'#C5D0DC',size:11}},
+    xaxis:{...PL().xaxis,title:{text:'Phase (°)',font:{size:10}}},
+    yaxis:{...PL().yaxis,title:{text:'Magnitude (dB)',font:{size:10}}}}),{responsive:true});
+}
+
+// ── STEP RESPONSE ─────────────────────────────────────────────────────────────
+function drawStep(cn,cd){
+  const{t,y}=stepResp(cn,cd);
+  const m=stepMetrics(t,y,cn,cd);
+  let dc='';
+  if(!isNaN(m.zeta)){if(m.zeta<0)dc=' (Unstable)';else if(m.zeta<1)dc=' (Underdamped)';else if(m.zeta<=1.001)dc=' (Critically Damped)';else dc=' (Overdamped)';}
+  const mg=document.getElementById('step-mg');
+  mg.innerHTML=`ζ = ${fmt(m.zeta)}${dc} &nbsp; ωn = ${fmt(m.wn)} rad/s &nbsp; h% = ${fmt(m.Mp)} %<br>tr = ${fmt(m.tr)} s &nbsp; th = ${fmt(m.th)} s &nbsp; ts(2%) = ${fmt(m.ts2)} s &nbsp; ts(5%) = ${fmt(m.ts5)} s`;
+  mg.style.color=(!isNaN(m.Mp)&&m.Mp<5)?'#00E87A':(!isNaN(m.Mp)&&m.Mp<20)?'#F0A500':'#FF4545';
+  const trs=[{x:t,y:y,mode:'lines',line:{color:'#00C7E0',width:2.5},name:'y(t)'}];
+  const sh=[],an=[];
+  const yMax=Math.max(...y);
+  if(isFinite(m.yss)&&Math.abs(m.yss)>1e-9){
+    trs.push({x:[t[0],t[t.length-1]],y:[m.yss,m.yss],mode:'lines',line:{color:'#F0A500',dash:'dash',width:1.5},name:`yss=${fmt(m.yss)}`});
+    trs.push({x:[t[0],t[t.length-1]],y:[m.yss*1.02,m.yss*1.02],mode:'lines',line:{color:'#00E87A',dash:'dot',width:1},showlegend:false});
+    trs.push({x:[t[0],t[t.length-1]],y:[m.yss*0.98,m.yss*0.98],mode:'lines',line:{color:'#00E87A',dash:'dot',width:1},name:'±2% band'});
+  }
+  if(!isNaN(m.tr)&&isFinite(m.tr)){
+    sh.push({type:'line',x0:m.tr,y0:0,x1:m.tr,y1:yMax*1.1,line:{color:'#8A70E0',dash:'dot',width:1.5}});
+    an.push({x:m.tr,y:yMax*1.1,text:`tr=${fmt(m.tr)}s`,showarrow:false,font:{color:'#8A70E0',size:9},yanchor:'bottom'});
+  }
+  if(!isNaN(m.th)&&isFinite(m.th)&&m.Mp>0.5)
+    trs.push({x:[m.th],y:[yMax],mode:'markers',marker:{symbol:'triangle-down',size:12,color:'#FF4545'},name:`th=${fmt(m.th)}s`});
+  if(!isNaN(m.ts2)&&isFinite(m.ts2)){
+    sh.push({type:'line',x0:m.ts2,y0:0,x1:m.ts2,y1:yMax*1.1,line:{color:'#00E87A',dash:'dash',width:1.5}});
+    an.push({x:m.ts2,y:0,text:`ts(2%)=${fmt(m.ts2)}s`,showarrow:false,font:{color:'#00E87A',size:9},yanchor:'top'});
+  }
+  Plotly.react('plt-st',trs,PL({
+    title:{text:'Step Response — Closed-Loop T(s)',font:{color:'#C5D0DC',size:11}},
+    xaxis:{...PL().xaxis,title:{text:'Time (s)',font:{size:10}}},
+    yaxis:{...PL().yaxis,title:{text:'Amplitude',font:{size:10}}},
+    shapes:sh,annotations:an
+  }),{responsive:true});
+}
+
+// ── AUTO-UPDATE ────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tf-in,.sett-in').forEach(el=>el.addEventListener('change',runCalc));
+document.querySelectorAll('input[name="fb"]').forEach(el=>el.addEventListener('change',runCalc));
+setTimeout(runCalc,400);
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('SW registered:', r.scope))
+      .catch(e => console.log('SW error:', e));
+  });
+}
+</script>
+</body>
+</html>
