@@ -511,10 +511,10 @@ function drawPoles(cn,cd,on,od){
 function drawRLocus(on,od,kMax,kSteps){
   const nP=od.length-1;if(nP<=0)return;
 
-  // Asymptotic clip: roots grow as K^(1/nP)
+  // Tight clip based on asymptotic root growth K^(1/nP)
   const olPs0=roots(od);
   const maxPoleAbs=Math.max(1,...olPs0.map(p=>cx.abs(p)));
-  const asymClip=Math.pow(kMax,1/Math.max(nP,1))*4+maxPoleAbs*3;
+  const asymClip=Math.pow(kMax,1/Math.max(nP,1))*2+maxPoleAbs*2;
 
   // Use more steps near K=0 where breakaway happens
   const Klist=[];
