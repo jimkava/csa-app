@@ -90,7 +90,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Courie
 .stab.fail{color:var(--red);background:rgba(255,69,69,.08)}
 
 /* PLOT */
-.plt{flex:1;min-height:250px}
+.plt{flex:1;min-height:300px;width:100%}
+#plt-rl,#plt-nc,#plt-st{height:100%;min-height:320px}
 
 /* MOBILE */
 @media(max-width:620px){
@@ -107,14 +108,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Courie
   .metrics{font-size:10px}
 }
 </style>
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#070D1A">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="CSAnalyzer">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
 
@@ -546,8 +539,10 @@ function drawRLocus(on,od,kMax,kSteps){
   if(olZs.length)tr.push({x:olZs.map(p=>p.re),y:olZs.map(p=>p.im),mode:'markers',marker:{symbol:'circle-open',size:11,color:'#00E87A',line:{width:3}},name:'OL Zeros'});
   Plotly.react('plt-rl',tr,PL({
     title:{text:`Root Locus — K∈[0,${kMax}]`,font:{color:'#C5D0DC',size:11}},
-    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}}},
+    xaxis:{...PL().xaxis,title:{text:'Re(s)',font:{color:'#C5D0DC',size:10}},scaleanchor:'y',scaleratio:1},
     yaxis:{...PL().yaxis,title:{text:'Im(s)',font:{color:'#C5D0DC',size:10}}},
+    autosize:true,
+    margin:{l:50,r:16,t:36,b:46},
     shapes:[{type:'line',x0:0,y0:-1e6,x1:0,y1:1e6,line:{color:'rgba(255,80,80,0.3)',dash:'dot',width:1}}]
   }),{responsive:true});
 }
@@ -633,16 +628,6 @@ function drawStep(cn,cd){
 document.querySelectorAll('.tf-in,.sett-in').forEach(el=>el.addEventListener('change',runCalc));
 document.querySelectorAll('input[name="fb"]').forEach(el=>el.addEventListener('change',runCalc));
 setTimeout(runCalc,400);
-</script>
-
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(r => console.log('SW registered:', r.scope))
-      .catch(e => console.log('SW error:', e));
-  });
-}
 </script>
 </body>
 </html>
